@@ -67,8 +67,8 @@ class EGLOffscreenContext {
   //   A boolean set to false if any error occured during the process, and set
   //   to true otherwise.
   static bool Create(
-      const int pixel_buffer_width, const int pixel_buffer_height,
       std::unique_ptr<EGLOffscreenContext>* egl_offscreen_context,
+      const int pixel_buffer_width = 0, const int pixel_buffer_height = 0,
       const EGLenum rendering_api = EGL_OPENGL_API,
       const EGLint* configuration_attributes = kDefaultConfigurationAttributes,
       const EGLint* context_attributes = kDefaultContextAttributes);

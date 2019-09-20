@@ -16,7 +16,7 @@ limitations under the License.
 
 #include <memory>
 
-#include "tensorflow_graphics/rendering/opengl/gl_macros.h"
+#include "absl/strings/string_view.h"
 #include "tensorflow/core/lib/gtl/cleanup.h"
 
 namespace gl_utils {
@@ -107,10 +107,56 @@ bool Program::Create(const std::vector<std::pair<std::string, GLenum>>& shaders,
   return true;
 }
 
-GLuint Program::GetHandle() const { return program_handle_; }
+bool Program::GetProgramResourceIndex(GLenum program_interface,
+                                      absl::string_view resource_name,
+                                      GLuint* resource_index) const {
+  RETURN_FALSE_IF_GL_ERROR(*resource_index = glGetProgramResourceIndex(
+                               program_handle_, program_interface,
+                               resource_name.data()));
+  return true;
+}
 
-ShaderStorageBuffer::ShaderStorageBuffer(GLuint buffer)
-    : buffer_(buffer) {}
+bool Program::GetProgramResourceiv(GLenum program_interface,
+                                   GLuint resource_index, int num_properties,
+                                   const GLenum* properties,
+                                   int num_property_value, GLsizei* length,
+                                   GLint* property_value) const {
+  RETURN_FALSE_IF_GL_ERROR(glGetProgramResourceiv(
+      program_handle_, program_interface, resource_index, num_properties,
+      properties, num_property_value, length, property_value));
+  return true;
+}
+
+bool Program::GetResourceProperty(const std::string& resource_name,
+                                  GLenum program_interface, int num_properties,
+                                  const GLenum* properties,
+                                  int num_property_value,
+                                  GLint* property_value) {
+  if (num_property_value != num_properties) return false;
+
+  GLuint resource_index;
+  // Query the index of the named resource within the program.
+  RETURN_FALSE_IF_ERROR(GetProgramResourceIndex(
+      program_interface, resource_name, &resource_index));
+
+  // No resource is active under that name.
+  if (resource_index == GL_INVALID_INDEX) return false;
+
+  // Retrieve the value for the property.
+  GLsizei length;
+  RETURN_FALSE_IF_ERROR(GetProgramResourceiv(
+      program_interface, resource_index, num_properties, properties,
+      num_property_value, &length, property_value));
+  if (length != num_properties) return false;
+  return true;
+}
+
+bool Program::Use() const {
+  RETURN_FALSE_IF_GL_ERROR(glUseProgram(program_handle_));
+  return true;
+}
+
+ShaderStorageBuffer::ShaderStorageBuffer(GLuint buffer) : buffer_(buffer) {}
 
 ShaderStorageBuffer::~ShaderStorageBuffer() { glDeleteBuffers(1, &buffer_); }
 

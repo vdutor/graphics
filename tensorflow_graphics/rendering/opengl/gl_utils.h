@@ -50,7 +50,32 @@ class Program {
   //   to true otherwise.
   static bool Create(const std::vector<std::pair<std::string, GLenum>>& shaders,
                      std::unique_ptr<Program>* program);
-  GLuint GetHandle() const;
+
+  // Queries the value of properties within the progam.
+  //
+  // Arguments:
+  // * resource_name: name of the resource to query the properties of.
+  // * program_interface: a token identifying the interface within program
+  //   containing the resource named name. See
+  //   https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glGetProgramResourceIndex.xhtml
+  //   for the list of possible values.
+  // * num_properties: number of elements in 'properties'.
+  // * properties: array of properties to get values for. See
+  //   https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glGetProgramResource.xhtml
+  //   for the list of available properties.
+  // * num_property_value: number of elements in 'property_value'.
+  // * property_value: an array containing the value of the 'properties' in the
+  //   resource 'resource_name'.
+  // Returns:
+  //   A boolean set to false if any error occured during the process, and set
+  //   to true otherwise.
+  bool GetResourceProperty(const std::string& resource_name,
+                           GLenum program_interface, int num_properties,
+                           const GLenum* properties, int num_property_value,
+                           GLint* property_value);
+
+  // Installs the program as part of current rendering state.
+  bool Use() const;
 
  private:
   Program() = delete;
@@ -72,6 +97,13 @@ class Program {
   //   to true otherwise.
   static bool CompileShader(const string& shader_code,
                             const GLenum& shader_type, GLuint* shader_idx);
+  bool GetProgramResourceIndex(GLenum program_interface,
+                               absl::string_view resource_name,
+                               GLuint* resource_index) const;
+  bool GetProgramResourceiv(GLenum program_interface, GLuint resource_index,
+                            int num_properties, const GLenum* properties,
+                            int num_property_value, GLsizei* length,
+                            GLint* property_value) const;
 
   GLuint program_handle_;
 };
@@ -83,6 +115,9 @@ template <typename T>
 class RenderTargets {
  public:
   ~RenderTargets();
+
+  // Binds the framebuffer to GL_FRAMEBUFFER.
+  bool BindFramebuffer() const;
 
   // Creates a depth render buffer and a color render buffer. After
   // creation, these two render buffers are attached to the frame buffer.
@@ -152,6 +187,12 @@ RenderTargets<T>::~RenderTargets() {
   glDeleteRenderbuffers(1, &color_buffer_);
   glDeleteRenderbuffers(1, &depth_buffer_);
   glDeleteFramebuffers(1, &frame_buffer_);
+}
+
+template <typename T>
+bool RenderTargets<T>::BindFramebuffer() const {
+  RETURN_FALSE_IF_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer_));
+  return true;
 }
 
 template <typename T>
@@ -264,7 +305,7 @@ bool RenderTargets<T>::ReadPixelsValidPixelType(absl::Span<T> buffer,
   }
 
   RETURN_FALSE_IF_GL_ERROR(
-      glReadPixels(0, 0, width_, height_, GL_RGBA, pixel_type, &buffer[0]));
+      glReadPixels(0, 0, width_, height_, GL_RGBA, pixel_type, buffer.data()));
   return true;
 }
 

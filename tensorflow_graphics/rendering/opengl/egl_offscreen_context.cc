@@ -52,8 +52,8 @@ EGLOffscreenContext::~EGLOffscreenContext() {
 }
 
 bool EGLOffscreenContext::Create(
-    const int pixel_buffer_width, const int pixel_buffer_height,
     std::unique_ptr<EGLOffscreenContext>* egl_offscreen_context,
+    const int pixel_buffer_width, const int pixel_buffer_height,
     const EGLenum rendering_api, const EGLint* configuration_attributes,
     const EGLint* context_attributes) {
   EGLBoolean success;
