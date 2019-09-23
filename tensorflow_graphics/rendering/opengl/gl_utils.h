@@ -25,7 +25,7 @@ limitations under the License.
 #include "GL/gl/include/GLES3/gl32.h"
 #include "absl/types/span.h"
 #include "tensorflow_graphics/rendering/opengl/gl_macros.h"
-#include "tensorflow/core/lib/gtl/cleanup.h"
+#include "tensorflow_graphics/util/cleanup.h"
 
 namespace gl_utils {
 
@@ -50,7 +50,32 @@ class Program {
   //   to true otherwise.
   static bool Create(const std::vector<std::pair<std::string, GLenum>>& shaders,
                      std::unique_ptr<Program>* program);
-  GLuint GetHandle() const;
+
+  // Queries the value of properties within the progam.
+  //
+  // Arguments:
+  // * resource_name: name of the resource to query the properties of.
+  // * program_interface: a token identifying the interface within program
+  //   containing the resource named name. See
+  //   https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glGetProgramResourceIndex.xhtml
+  //   for the list of possible values.
+  // * num_properties: number of elements in 'properties'.
+  // * properties: array of properties to get values for. See
+  //   https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glGetProgramResource.xhtml
+  //   for the list of available properties.
+  // * num_property_value: number of elements in 'property_value'.
+  // * property_value: an array containing the value of the 'properties' in the
+  //   resource 'resource_name'.
+  // Returns:
+  //   A boolean set to false if any error occured during the process, and set
+  //   to true otherwise.
+  bool GetResourceProperty(const std::string& resource_name,
+                           GLenum program_interface, int num_properties,
+                           const GLenum* properties, int num_property_value,
+                           GLint* property_value);
+
+  // Installs the program as part of current rendering state.
+  bool Use() const;
 
  private:
   Program() = delete;
@@ -72,6 +97,13 @@ class Program {
   //   to true otherwise.
   static bool CompileShader(const string& shader_code,
                             const GLenum& shader_type, GLuint* shader_idx);
+  bool GetProgramResourceIndex(GLenum program_interface,
+                               absl::string_view resource_name,
+                               GLuint* resource_index) const;
+  bool GetProgramResourceiv(GLenum program_interface, GLuint resource_index,
+                            int num_properties, const GLenum* properties,
+                            int num_property_value, GLsizei* length,
+                            GLint* property_value) const;
 
   GLuint program_handle_;
 };
@@ -83,6 +115,9 @@ template <typename T>
 class RenderTargets {
  public:
   ~RenderTargets();
+
+  // Binds the framebuffer to GL_FRAMEBUFFER.
+  bool BindFramebuffer() const;
 
   // Creates a depth render buffer and a color render buffer. After
   // creation, these two render buffers are attached to the frame buffer.
@@ -155,6 +190,12 @@ RenderTargets<T>::~RenderTargets() {
 }
 
 template <typename T>
+bool RenderTargets<T>::BindFramebuffer() const {
+  RETURN_FALSE_IF_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer_));
+  return true;
+}
+
+template <typename T>
 bool RenderTargets<T>::Create(
     GLsizei width, GLsizei height,
     std::unique_ptr<RenderTargets<T>>* render_targets) {
@@ -186,8 +227,8 @@ bool RenderTargets<T>::CreateValidInternalFormat(
 
   // Generate one render buffer for color.
   RETURN_FALSE_IF_GL_ERROR(glGenRenderbuffers(1, &color_buffer));
-  auto gen_color_cleanup = tensorflow::gtl::MakeCleanup(
-      [color_buffer]() { glDeleteFramebuffers(1, &color_buffer); });
+  auto gen_color_cleanup =
+      MakeCleanup([color_buffer]() { glDeleteFramebuffers(1, &color_buffer); });
   // Bind the color buffer.
   RETURN_FALSE_IF_GL_ERROR(glBindRenderbuffer(GL_RENDERBUFFER, color_buffer));
   // Define the data storage, format, and dimensions of a render buffer
@@ -197,8 +238,8 @@ bool RenderTargets<T>::CreateValidInternalFormat(
 
   // Generate one render buffer for depth.
   RETURN_FALSE_IF_GL_ERROR(glGenRenderbuffers(1, &depth_buffer));
-  auto gen_depth_cleanup = tensorflow::gtl::MakeCleanup(
-      [depth_buffer]() { glDeleteFramebuffers(1, &depth_buffer); });
+  auto gen_depth_cleanup =
+      MakeCleanup([depth_buffer]() { glDeleteFramebuffers(1, &depth_buffer); });
   // Bind the depth buffer.
   RETURN_FALSE_IF_GL_ERROR(glBindRenderbuffer(GL_RENDERBUFFER, depth_buffer));
   // Defines the data storage, format, and dimensions of a render buffer
@@ -208,8 +249,8 @@ bool RenderTargets<T>::CreateValidInternalFormat(
 
   // Generate one frame buffer.
   RETURN_FALSE_IF_GL_ERROR(glGenFramebuffers(1, &frame_buffer));
-  auto gen_frame_cleanup = tensorflow::gtl::MakeCleanup(
-      [frame_buffer]() { glDeleteFramebuffers(1, &frame_buffer); });
+  auto gen_frame_cleanup =
+      MakeCleanup([frame_buffer]() { glDeleteFramebuffers(1, &frame_buffer); });
   // Bind the frame buffer to both read and draw frame buffer targets.
   RETURN_FALSE_IF_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer));
   // Attach the color buffer to the frame buffer.
@@ -264,7 +305,7 @@ bool RenderTargets<T>::ReadPixelsValidPixelType(absl::Span<T> buffer,
   }
 
   RETURN_FALSE_IF_GL_ERROR(
-      glReadPixels(0, 0, width_, height_, GL_RGBA, pixel_type, &buffer[0]));
+      glReadPixels(0, 0, width_, height_, GL_RGBA, pixel_type, buffer.data()));
   return true;
 }
 
@@ -295,8 +336,8 @@ template <typename T>
 bool ShaderStorageBuffer::Upload(absl::Span<T> data) const {
   // Bind the buffer to the read/write storage for shaders.
   RETURN_FALSE_IF_GL_ERROR(glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer_));
-  auto bind_cleanup = tensorflow::gtl::MakeCleanup(
-      []() { glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); });
+  auto bind_cleanup =
+      MakeCleanup([]() { glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); });
   // Create a new data store for the bound buffer and initializes it with the
   // input data.
   RETURN_FALSE_IF_GL_ERROR(glBufferData(GL_SHADER_STORAGE_BUFFER,

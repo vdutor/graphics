@@ -29,15 +29,32 @@ const std::string kEmptyShaderCode =
     "#version 430\n"
     "void main() { }\n";
 
-TEST(GLUtilsTest, TestCompileInvalidShader) {
+const std::string geometry_shader_code =
+    "#version 430\n"
+    "\n"
+    "uniform mat4 view_projection_matrix;\n"
+    "\n"
+    "layout(points) in;\n"
+    "layout(triangle_strip, max_vertices=2) out;\n"
+    "\n"
+    "void main() {\n"
+    "  gl_Position = view_projection_matrix * vec4(1.0,2.0,3.0,4.0);\n"
+    "\n"
+    "  EmitVertex();\n"
+    "  EmitVertex();\n"
+    "  EndPrimitive();\n"
+    "}\n";
+
+TEST(ProgramTest, TestCompileInvalidShader) {
   std::unique_ptr<EGLOffscreenContext> context;
   std::unique_ptr<gl_utils::Program> program;
   const std::string kInvalidShaderCode =
       "#version 430\n"
+      "uniform mat4 view_projection_matrix;\n"
       "void main() { syntax_error }\n";
 
-  ASSERT_TRUE(EGLOffscreenContext::Create(1, 1, &context));
-  ASSERT_TRUE(context->MakeCurrent());
+  EXPECT_TRUE(EGLOffscreenContext::Create(&context));
+  EXPECT_TRUE(context->MakeCurrent());
 
   std::vector<std::pair<std::string, GLenum>> shaders;
   shaders.push_back(
@@ -46,15 +63,15 @@ TEST(GLUtilsTest, TestCompileInvalidShader) {
   EXPECT_TRUE(context->Release());
 }
 
-TEST(GLUtilsTest, TestCompileInvalidShaderType) {
+TEST(ProgramTest, TestCompileInvalidShaderType) {
   std::unique_ptr<EGLOffscreenContext> context;
   std::unique_ptr<gl_utils::Program> program;
   const std::string kInvalidShaderCode =
       "#version 430\n"
       "void main() { syntax_error }\n";
 
-  ASSERT_TRUE(EGLOffscreenContext::Create(1, 1, &context));
-  ASSERT_TRUE(context->MakeCurrent());
+  EXPECT_TRUE(EGLOffscreenContext::Create(&context));
+  EXPECT_TRUE(context->MakeCurrent());
 
   std::vector<std::pair<std::string, GLenum>> shaders;
   shaders.push_back(std::pair<std::string, GLenum>(kEmptyShaderCode, 0));
@@ -62,18 +79,53 @@ TEST(GLUtilsTest, TestCompileInvalidShaderType) {
   EXPECT_TRUE(context->Release());
 }
 
-TEST(GLUtilsTest, TestCreateProgram) {
+TEST(ProgramTest, TestCreateProgram) {
   std::unique_ptr<EGLOffscreenContext> context;
   std::unique_ptr<gl_utils::Program> program;
 
-  ASSERT_TRUE(EGLOffscreenContext::Create(1, 1, &context));
-  ASSERT_TRUE(context->MakeCurrent());
+  EXPECT_TRUE(EGLOffscreenContext::Create(&context));
+  EXPECT_TRUE(context->MakeCurrent());
 
   std::vector<std::pair<std::string, GLenum>> shaders;
   shaders.push_back(
       std::pair<std::string, GLenum>(kEmptyShaderCode, GL_VERTEX_SHADER));
   EXPECT_TRUE(gl_utils::Program::Create(shaders, &program));
-  EXPECT_NE(0, program->GetHandle());
+  EXPECT_TRUE(context->Release());
+}
+
+TEST(ProgramTest, TestGetNonExistingResourceProperty) {
+  std::unique_ptr<EGLOffscreenContext> context;
+  std::unique_ptr<gl_utils::Program> program;
+  GLint property_value;
+  const GLenum kProperty = GL_TYPE;
+
+  EXPECT_TRUE(EGLOffscreenContext::Create(&context));
+  EXPECT_TRUE(context->MakeCurrent());
+
+  std::vector<std::pair<std::string, GLenum>> shaders;
+  shaders.push_back(
+      std::pair<std::string, GLenum>(kEmptyShaderCode, GL_VERTEX_SHADER));
+  EXPECT_TRUE(gl_utils::Program::Create(shaders, &program));
+  EXPECT_FALSE(program->GetResourceProperty("resource_name", GL_UNIFORM, 1,
+                                            &kProperty, 1, &property_value));
+  EXPECT_TRUE(context->Release());
+}
+
+TEST(ProgramTest, TestGetExistingResourceProperty) {
+  std::unique_ptr<EGLOffscreenContext> context;
+  std::unique_ptr<gl_utils::Program> program;
+  GLint property_value;
+  GLenum kProperty = GL_TYPE;
+
+  EXPECT_TRUE(EGLOffscreenContext::Create(&context));
+  EXPECT_TRUE(context->MakeCurrent());
+
+  std::vector<std::pair<std::string, GLenum>> shaders;
+  shaders.push_back(std::make_pair(kEmptyShaderCode, GL_VERTEX_SHADER));
+  shaders.push_back(std::make_pair(geometry_shader_code, GL_GEOMETRY_SHADER));
+  EXPECT_TRUE(gl_utils::Program::Create(shaders, &program));
+  EXPECT_TRUE(program->GetResourceProperty("view_projection_matrix", GL_UNIFORM,
+                                           1, &kProperty, 1, &property_value));
   EXPECT_TRUE(context->Release());
 }
 
@@ -94,8 +146,8 @@ TYPED_TEST(RenderTargetsInterfaceTest, TestRenderClear) {
 
   if (typeid(TypeParam) == typeid(float)) max_gl_value = 1.0f;
 
-  ASSERT_TRUE(EGLOffscreenContext::Create(kWidth, kHeight, &context));
-  ASSERT_TRUE(context->MakeCurrent());
+  EXPECT_TRUE(EGLOffscreenContext::Create(&context));
+  EXPECT_TRUE(context->MakeCurrent());
 
   std::unique_ptr<gl_utils::RenderTargets<TypeParam>> render_targets;
   EXPECT_TRUE(gl_utils::RenderTargets<TypeParam>::Create(kWidth, kHeight,
@@ -107,10 +159,10 @@ TYPED_TEST(RenderTargetsInterfaceTest, TestRenderClear) {
   EXPECT_TRUE(render_targets->ReadPixels(absl::MakeSpan(pixels)));
 
   for (int index = 0; index < kWidth * kHeight; ++index) {
-    EXPECT_EQ(pixels[index * 4], TypeParam(kRed * max_gl_value));
-    EXPECT_EQ(pixels[index * 4 + 1], TypeParam(kGreen * max_gl_value));
-    EXPECT_EQ(pixels[index * 4 + 2], TypeParam(kBlue * max_gl_value));
-    EXPECT_EQ(pixels[index * 4 + 3], TypeParam(kAlpha * max_gl_value));
+    ASSERT_EQ(pixels[index * 4], TypeParam(kRed * max_gl_value));
+    ASSERT_EQ(pixels[index * 4 + 1], TypeParam(kGreen * max_gl_value));
+    ASSERT_EQ(pixels[index * 4 + 2], TypeParam(kBlue * max_gl_value));
+    ASSERT_EQ(pixels[index * 4 + 3], TypeParam(kAlpha * max_gl_value));
   }
   EXPECT_TRUE(context->Release());
 }
@@ -120,8 +172,8 @@ TYPED_TEST(RenderTargetsInterfaceTest, TestReadFails) {
   const int kWidth = 10;
   const int kHeight = 5;
 
-  ASSERT_TRUE(EGLOffscreenContext::Create(kWidth, kHeight, &context));
-  ASSERT_TRUE(context->MakeCurrent());
+  EXPECT_TRUE(EGLOffscreenContext::Create(&context));
+  EXPECT_TRUE(context->MakeCurrent());
   std::unique_ptr<gl_utils::RenderTargets<TypeParam>> render_targets;
   EXPECT_TRUE(gl_utils::RenderTargets<TypeParam>::Create(kWidth, kHeight,
                                                          &render_targets));

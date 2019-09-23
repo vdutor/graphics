@@ -20,6 +20,11 @@ limitations under the License.
 #include "GL/gl/include/GLES3/gl32.h"
 #include "absl/strings/str_cat.h"
 
+#define RETURN_FALSE_IF_ERROR(status)    \
+  do {                                   \
+    if ((status) == false) return false; \
+  } while (false)
+
 #define RETURN_FALSE_IF_GL_ERROR(gl_statement)                        \
   do {                                                                \
     (gl_statement);                                                   \

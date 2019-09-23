@@ -23,15 +23,15 @@ namespace {
 TEST(EglOffscreenContextTest, TestCreate) {
   std::unique_ptr<EGLOffscreenContext> context;
 
-  EXPECT_TRUE(EGLOffscreenContext::Create(800, 600, &context));
+  EXPECT_TRUE(EGLOffscreenContext::Create(&context, 800, 600));
 }
 
 TEST(EglOffscreenContextTest, TestMakeCurrentWorks) {
   std::unique_ptr<EGLOffscreenContext> context1;
   std::unique_ptr<EGLOffscreenContext> context2;
 
-  EXPECT_TRUE(EGLOffscreenContext::Create(800, 600, &context1));
-  EXPECT_TRUE(EGLOffscreenContext::Create(400, 100, &context2));
+  EXPECT_TRUE(EGLOffscreenContext::Create(&context1, 800, 600));
+  EXPECT_TRUE(EGLOffscreenContext::Create(&context2, 400, 100));
   EXPECT_TRUE(context1->MakeCurrent());
   EXPECT_TRUE(context2->MakeCurrent());
 }
@@ -39,7 +39,7 @@ TEST(EglOffscreenContextTest, TestMakeCurrentWorks) {
 TEST(EglOffscreenContextTest, TestRelease) {
   std::unique_ptr<EGLOffscreenContext> context;
 
-  EXPECT_TRUE(EGLOffscreenContext::Create(800, 600, &context));
+  EXPECT_TRUE(EGLOffscreenContext::Create(&context, 800, 600));
   EXPECT_TRUE(context->MakeCurrent());
   EXPECT_TRUE(context->Release());
 }
@@ -54,7 +54,7 @@ TEST(EglOffscreenContextTest, TestRenderClear) {
   const int kHeight = 5;
   std::vector<uint8> pixels(kWidth * kHeight * 4);
 
-  EXPECT_TRUE(EGLOffscreenContext::Create(kWidth, kHeight, &context));
+  EXPECT_TRUE(EGLOffscreenContext::Create(&context, kWidth, kHeight));
   EXPECT_TRUE(context->MakeCurrent());
   glClearColor(kRed, kGreen, kBlue, kAlpha);
   glClear(GL_COLOR_BUFFER_BIT);

@@ -18,7 +18,7 @@ limitations under the License.
 
 #include "GL/util/egl_util.h"
 #include "tensorflow_graphics/rendering/opengl/gl_macros.h"
-#include "tensorflow/core/lib/gtl/cleanup.h"
+#include "tensorflow_graphics/util/cleanup.h"
 
 EGLOffscreenContext::EGLOffscreenContext(EGLContext context, EGLDisplay display,
                                          EGLSurface pixel_buffer_surface)
@@ -52,8 +52,8 @@ EGLOffscreenContext::~EGLOffscreenContext() {
 }
 
 bool EGLOffscreenContext::Create(
-    const int pixel_buffer_width, const int pixel_buffer_height,
     std::unique_ptr<EGLOffscreenContext>* egl_offscreen_context,
+    const int pixel_buffer_width, const int pixel_buffer_height,
     const EGLenum rendering_api, const EGLint* configuration_attributes,
     const EGLint* context_attributes) {
   EGLBoolean success;
@@ -64,8 +64,8 @@ bool EGLOffscreenContext::Create(
   // Create an EGL display at device index 0.
   display = CreateInitializedEGLDisplay();
   if (display == EGL_NO_DISPLAY) return false;
-  auto initialize_cleanup = tensorflow::gtl::MakeCleanup(
-      [display]() { TerminateInitializedEGLDisplay(display); });
+  auto initialize_cleanup =
+      MakeCleanup([display]() { TerminateInitializedEGLDisplay(display); });
 
   // Set the current rendering API.
   RETURN_FALSE_IF_EGL_ERROR(success = eglBindAPI(rendering_api));
@@ -91,10 +91,9 @@ bool EGLOffscreenContext::Create(
       pixel_buffer_surface = eglCreatePbufferSurface(
           display, frame_buffer_configuration, pixel_buffer_attributes));
   if (pixel_buffer_surface == EGL_NO_SURFACE) return false;
-  auto surface_cleanup =
-      tensorflow::gtl::MakeCleanup([display, pixel_buffer_surface]() {
-        eglDestroySurface(display, pixel_buffer_surface);
-      });
+  auto surface_cleanup = MakeCleanup([display, pixel_buffer_surface]() {
+    eglDestroySurface(display, pixel_buffer_surface);
+  });
 
   // Create the EGL rendering context.
   RETURN_FALSE_IF_EGL_ERROR(

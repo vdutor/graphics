@@ -40,9 +40,9 @@ cc_library(
     hdrs = ["egl_offscreen_context.h"],
     deps = [
         ":gl_macros",
+        "//tensorflow_graphics/util:cleanup",
         "//third_party/GL:EGL_headers",
         "//third_party/GL/util:egl_util",
-        "//third_party/tensorflow/core:lib",
     ],
 )
 
@@ -87,8 +87,9 @@ cc_library(
     hdrs = ["gl_utils.h"],
     deps = [
         ":gl_macros",
+        "//tensorflow_graphics/util:cleanup",
         "//third_party/GL:GLES3_headers",
-        "//third_party/tensorflow/core:lib",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -142,6 +143,57 @@ py_test(
         # google internal package dependency 6
         # google internal package dependency 1,
         "//tensorflow_graphics/util:test_case",
+    ],
+)
+
+cc_library(
+    name = "rasterizer",
+    hdrs = ["rasterizer.h"],
+    deps = [
+        ":gl_utils",
+        "//tensorflow_graphics/util:cleanup",
+    ],
+)
+
+cc_test(
+    name = "rasterizer_test",
+    srcs = ["tests/rasterizer_test.cc"],
+    tags = [
+        "nomsan",  # Un-initialized values in libEGL.
+        "requires-gpu-sm35",
+    ],
+    deps = [
+        ":egl_offscreen_context",
+        ":gl_native_libs",
+        ":rasterizer",
+        "@com_google_absl//absl/types:span",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "rasterizer_with_context",
+    hdrs = ["rasterizer_with_context.h"],
+    deps = [
+        ":egl_offscreen_context",
+        ":gl_utils",
+        ":rasterizer",
+        "//tensorflow_graphics/util:cleanup",
+    ],
+)
+
+cc_test(
+    name = "rasterizer_with_context_test",
+    srcs = ["tests/rasterizer_with_context_test.cc"],
+    tags = [
+        "nomsan",  # Un-initialized values in libEGL.
+        "requires-gpu-sm35",
+    ],
+    deps = [
+        ":gl_native_libs",
+        ":rasterizer_with_context",
+        ":thread_safe_resource_pool",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
