@@ -14,6 +14,7 @@
 # Math functionalities for tf-graphics.
 
 # google internal package dependency 8)
+load("//third_party/tensorflow:tensorflow.bzl", "tf_gen_op_wrapper_py")
 # google internal package dependency 5
 
 licenses(["notice"])  # Apache 2.0
@@ -39,7 +40,8 @@ cc_library(
     srcs = ["egl_offscreen_context.cc"],
     hdrs = ["egl_offscreen_context.h"],
     deps = [
-        ":gl_macros",
+        ":macros",
+        "//tensorflow_graphics/util:cleanup",
         "//third_party/GL:EGL_headers",
         "//third_party/GL/util:egl_util",
         "//third_party/tensorflow/core:lib",
@@ -62,11 +64,12 @@ cc_test(
 )
 
 cc_library(
-    name = "gl_macros",
-    hdrs = ["gl_macros.h"],
+    name = "macros",
+    hdrs = ["macros.h"],
     deps = [
         "//third_party/GL:EGL_headers",
         "//third_party/GL:GLES3_headers",
+        "//third_party/tensorflow/core:lib",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -81,14 +84,28 @@ cc_library(
     alwayslink = 1,
 )
 
+# This library provides stub implementation of the OpenGL libraries.
+# Link to it in tf_gen_op_wrapper_py targets in order to avoid breaking
+# builds on Forge due to missing OpenGL libraries.
+cc_library(
+    name = "gl_stub_libs",
+    deps = [
+        "//third_party/GL/stub:EGL",  # buildcleaner: keep
+        "//third_party/GL/stub:GLESv2",  # buildcleaner: keep
+    ],
+    alwayslink = 1,
+)
+
 cc_library(
     name = "gl_utils",
     srcs = ["gl_utils.cc"],
     hdrs = ["gl_utils.h"],
     deps = [
-        ":gl_macros",
+        ":macros",
+        "//tensorflow_graphics/util:cleanup",
         "//third_party/GL:GLES3_headers",
         "//third_party/tensorflow/core:lib",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -146,9 +163,112 @@ py_test(
 )
 
 cc_library(
+    name = "rasterizer",
+    hdrs = ["rasterizer.h"],
+    deps = [
+        ":gl_utils",
+        "//tensorflow_graphics/util:cleanup",
+        "//third_party/tensorflow/core:lib",
+    ],
+)
+
+cc_test(
+    name = "rasterizer_test",
+    srcs = ["tests/rasterizer_test.cc"],
+    tags = [
+        "nomsan",  # Un-initialized values in libEGL.
+        "requires-gpu-sm35",
+    ],
+    deps = [
+        ":egl_offscreen_context",
+        ":gl_native_libs",
+        ":rasterizer",
+        "@com_google_absl//absl/types:span",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "rasterizer_op",
+    srcs = ["rasterizer_op.cc"],
+    deps = [
+        ":macros",
+        ":rasterizer_with_context",
+        ":thread_safe_resource_pool",
+        "//third_party/tensorflow/core:framework",
+        "//third_party/tensorflow/core:lib",
+        "@com_google_absl//absl/types:span",
+    ],
+    alwayslink = 1,
+)
+
+tf_gen_op_wrapper_py(
+    name = "gen_rasterizer_op",
+    out = "gen_rasterizer_op.py",
+    deps = [
+        ":gl_stub_libs",
+        ":rasterizer_op",
+    ],
+)
+
+py_test(
+    name = "rasterizer_op_test",
+    srcs = [
+        "tests/rasterizer_op_test.py",
+    ],
+    srcs_version = "PY2AND3",
+    # google internal rule 1
+    test_on_cpu = False,  # TODO: fix linking errors
+    # google internal rule 3
+    # google internal rule 4
+    # google internal rule 5
+    # google internal rule 6
+    deps = [
+        ":gen_rasterizer_op",  # buildcleaner: keep
+        ":gl_native_libs",
+        ":math",
+        ":rasterizer_op",  # buildcleaner: keep
+        # google internal package dependency 6
+        "//third_party/py/six",
+        # google internal package dependency 1,
+        "//tensorflow_graphics/util:test_case",
+    ],
+)
+
+cc_library(
+    name = "rasterizer_with_context",
+    hdrs = ["rasterizer_with_context.h"],
+    deps = [
+        ":egl_offscreen_context",
+        ":gl_utils",
+        ":rasterizer",
+        "//tensorflow_graphics/util:cleanup",
+        "//third_party/tensorflow/core:lib",
+    ],
+)
+
+cc_test(
+    name = "rasterizer_with_context_test",
+    srcs = ["tests/rasterizer_with_context_test.cc"],
+    tags = [
+        "nomsan",  # Un-initialized values in libEGL.
+        "requires-gpu-sm35",
+    ],
+    deps = [
+        ":gl_native_libs",
+        ":rasterizer_with_context",
+        ":thread_safe_resource_pool",
+        "//third_party/tensorflow/core:lib",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "thread_safe_resource_pool",
     hdrs = ["thread_safe_resource_pool.h"],
     deps = [
+        ":macros",
+        "//third_party/tensorflow/core:lib",
         "@com_google_absl//absl/synchronization",
     ],
 )
@@ -158,6 +278,7 @@ cc_test(
     srcs = ["tests/thread_safe_resource_pool_test.cc"],
     deps = [
         ":thread_safe_resource_pool",
+        "//third_party/tensorflow/core:lib",
         "@com_google_googletest//:gtest_main",
     ],
 )

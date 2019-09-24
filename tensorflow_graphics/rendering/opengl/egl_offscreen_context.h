@@ -19,6 +19,8 @@ limitations under the License.
 
 #include <memory>
 
+#include "tensorflow/core/lib/core/status.h"
+
 static const EGLint kDefaultConfigurationAttributes[] = {
     EGL_SURFACE_TYPE,
     EGL_PBUFFER_BIT,
@@ -64,11 +66,11 @@ class EGLOffscreenContext {
   //     EGL_OPENVG_API.
   //
   // Returns:
-  //   A boolean set to false if any error occured during the process, and set
-  //   to true otherwise.
-  static bool Create(
-      const int pixel_buffer_width, const int pixel_buffer_height,
+  //   A tensorflow::Status object storing tensorflow::Status::OK() on success,
+  //   and an object of type tensorflow::errors otherwise.
+  static tensorflow::Status Create(
       std::unique_ptr<EGLOffscreenContext>* egl_offscreen_context,
+      const int pixel_buffer_width = 0, const int pixel_buffer_height = 0,
       const EGLenum rendering_api = EGL_OPENGL_API,
       const EGLint* configuration_attributes = kDefaultConfigurationAttributes,
       const EGLint* context_attributes = kDefaultContextAttributes);
@@ -78,17 +80,17 @@ class EGLOffscreenContext {
   // thread.
   //
   // Returns:
-  //   A boolean set to false if any error occured during the process, and set
-  //   to true otherwise.
-  bool MakeCurrent() const;
+  //   A tensorflow::Status object storing tensorflow::Status::OK() on success,
+  //   and an object of type tensorflow::errors otherwise.
+  tensorflow::Status MakeCurrent() const;
 
   // Un-binds the current EGL rendering context from the current rendering
   // thread and from the pixel buffer surface.
   //
   // Returns:
-  //   A boolean set to false if any error occured during the process, and set
-  //   to true otherwise.
-  bool Release();
+  //   A tensorflow::Status object storing tensorflow::Status::OK() on success,
+  //   and an object of type tensorflow::errors otherwise.
+  tensorflow::Status Release();
 
  private:
   EGLOffscreenContext() = delete;
